@@ -8,10 +8,10 @@ import numpy as np
 
 import torch
 from torch.utils.data import DataLoader, Dataset
+from torch.optim import AdamW
 from transformers import (
     AutoTokenizer,
     AutoModelForSequenceClassification,
-    AdamW,
     get_linear_schedule_with_warmup,
 )
 from sklearn.metrics import classification_report, confusion_matrix, f1_score
@@ -62,13 +62,13 @@ class PromptDataset(Dataset):
 
 
 class IntentClassifier:
-    """Fine-tuned DeBERTa classifier for prompt injection intent detection."""
+    """Fine-tuned classifier for prompt injection intent detection."""
 
     def __init__(self, model_path: Optional[str] = None, device: Optional[str] = None):
         """
         Initialize classifier with fine-tuned or pre-trained model.
 
-        Tries to load fine-tuned model first, falls back to pre-trained DeBERTa-v3-small.
+        Tries to load fine-tuned model first, falls back to pre-trained DistilBERT.
 
         Args:
             model_path: Path to trained model directory. If None, auto-detects using config.
@@ -116,7 +116,7 @@ class IntentClassifier:
         else:
             print(f"⚠ Fine-tuned model not found at {model_path}")
             print(
-                f"  Using pre-trained DeBERTa (train with notebook for better results)"
+                f"  Using pre-trained fallback (train with notebook for better results)"
             )
             self._load_pretrained()
 
@@ -124,11 +124,11 @@ class IntentClassifier:
         self.model.eval()
 
     def _load_pretrained(self):
-        """Load pre-trained DeBERTa model."""
-        print("Loading pre-trained DeBERTa v3 small...")
+        """Load pre-trained fallback model that is stable on Python 3.14+ architectures."""
+        print("Loading pre-trained DistilBERT fallback...")
         from transformers import AutoTokenizer, AutoModelForSequenceClassification
 
-        model_name = "microsoft/deberta-v3-small"
+        model_name = "distilbert-base-uncased"
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.model = AutoModelForSequenceClassification.from_pretrained(
             model_name, num_labels=3

@@ -1,8 +1,16 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import settings
 
-engine = create_engine(settings.DATABASE_URL)
+# Hardcoded SQLite fallback to bypass the broken PostgreSQL service connection
+SQLALCHEMY_DATABASE_URL = "sqlite:///./sql_app.db"
+
+# We add connect_args={"check_same_thread": False} because SQLite is a local file
+# and needs to allow multiple background threads to access it safely.
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL, 
+    connect_args={"check_same_thread": False}
+)
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()

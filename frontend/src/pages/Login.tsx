@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { useAuthStore } from '../stores/authStore'
 import { authApi } from '../services/api'
@@ -18,19 +18,28 @@ export default function Login() {
     setLoading(true)
 
     try {
-      const tokenData = await authApi.login(email, password)
-      const user = await authApi.getMe()
-      setAuth(tokenData.access_token, user)
-      navigate('/')
-    } } catch (err: any) {
-  if (err.response?.data?.message) {
-    setError(err.response.data.message)
-  } else if (err.request) {
-    setError('Network error: Server is unreachable. Please check your connection.')
-  } else {
-    setError('An unexpected error occurred. Please try again.')
-  }
-} finally {
+      // 1. Send the email and password to your API
+      const response = await authApi.login(email, password)
+      
+      // 2. Save the resulting token/user info to your Auth Store
+      setAuth(response.data)
+      
+      // 3. Send them to the dashboard
+      navigate('/dashboard') 
+    } catch (err: any) {
+      // 1. Check if the server responded with a specific validation error message
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message)
+      } 
+      // 2. Check if the network is down or backend is unreachable
+      else if (err.request) {
+        setError("Unable to connect to server. Please try again later.")
+      } 
+      // 3. Generic fallback
+      else {
+        setError("An unexpected error occurred.")
+      }
+    } finally {
       setLoading(false)
     }
   }

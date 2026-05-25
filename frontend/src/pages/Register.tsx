@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { authApi } from '../services/api'
 import { Shield } from 'lucide-react'
@@ -20,17 +20,23 @@ export default function Register() {
     setLoading(true)
 
     try {
+      // Send the entire form payload to the auth API
       await authApi.register(formData)
       navigate('/login')
-    } } catch (err: any) {
-  if (err.response?.data?.message) {
-    setError(err.response.data.message)
-  } else if (err.request) {
-    setError('Network error: Server is unreachable. Please check your connection.')
-  } else {
-    setError('An unexpected error occurred. Please try again.')
-  }
-} finally {
+    } catch (err: any) {
+      // 1. Check if the server responded with a specific error message payload
+      if (err.response && err.response.data && err.response.data.message) {
+        setError(err.response.data.message)
+      } 
+      // 2. Check if the network is completely down or server is unreachable
+      else if (err.request) {
+        setError("Unable to connect to server. Please check your internet connection or try again later.")
+      } 
+      // 3. Fallback for any other internal execution errors
+      else {
+        setError("An unexpected error occurred. Please try again.")
+      }
+    } finally {
       setLoading(false)
     }
   }
