@@ -1,113 +1,62 @@
-import React, { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import { useAuthStore } from '../stores/authStore'
-import { authApi } from '../services/api'
-import { Shield } from 'lucide-react'
+import React, { useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
 export default function Login() {
-  const navigate = useNavigate()
-  const { setAuth } = useAuthStore()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [loading, setLoading] = useState(false)
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setLoading(true)
+    e.preventDefault();
+    setError('');
+    setLoading(false);
+
+    if (!email || !password) {
+      setError('Please fill in all fields');
+      return;
+    }
 
     try {
-      // 1. Send the email and password to your API
-      const response = await authApi.login(email, password)
-      
-      // 2. Save the resulting token/user info to your Auth Store
-      setAuth(response.data)
-      
-      // 3. Send them to the dashboard
-      navigate('/dashboard') 
-    } catch (err: any) {
-      // 1. Check if the server responded with a specific validation error message
-      if (err.response && err.response.data && err.response.data.message) {
-        setError(err.response.data.message)
-      } 
-      // 2. Check if the network is down or backend is unreachable
-      else if (err.request) {
-        setError("Unable to connect to server. Please try again later.")
-      } 
-      // 3. Generic fallback
-      else {
-        setError("An unexpected error occurred.")
+      setLoading(true);
+      const response = await axios.post('/api/v1/auth/login', { email, password });
+      localStorage.setItem('token', response.data.access_token);
+      navigate('/dashboard');
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        setError(err.response?.data?.detail || err.message || 'Login failed');
+      } else if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError('An unexpected communication error occurred.');
       }
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-xl shadow-lg">
-        <div className="text-center">
-          <div className="flex justify-center">
-            <Shield className="w-12 h-12 text-primary-600" />
-          </div>
-          <h2 className="mt-4 text-3xl font-bold text-gray-900">
-            EU AI Act Compliance
-          </h2>
-          <p className="mt-2 text-gray-600">Sign in to your account</p>
+    <div style={{ padding: '2rem', maxWidth: '400px', margin: '0 auto' }}>
+      <h2>Login to AegisAI</h2>
+      {error && <div style={{ color: 'red', marginBottom: '1rem' }}>{error}</div>}
+      <form onSubmit={handleSubmit}>
+        <div style={{ marginBottom: '1rem' }}>
+          <label>Email Address</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: '100%', padding: '0.5rem' }} />
         </div>
-
-        <form className="space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="p-3 text-sm text-red-600 bg-red-50 rounded-lg">
-              {error}
-            </div>
-          )}
-
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-              Email
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500"
-            />
-          </div>
-
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-              Password
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm focus:ring-primary-500 focus:border-primary-500"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2 px-4 border border-transparent rounded-lg shadow-sm text-white bg-primary-600 hover:bg-primary-700 focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
-          >
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-
-        <p className="text-center text-sm text-gray-600">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-primary-600 hover:text-primary-500">
-            Sign up
-          </Link>
-        </p>
-      </div>
+        <div style={{ marginBottom: '1rem' }}>
+          <label>Password</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: '100%', padding: '0.5rem' }} />
+        </div>
+        <button type="submit" disabled={loading} style={{ padding: '0.5rem 1rem' }}>
+          {loading ? 'Logging in...' : 'Sign In'}
+        </button>
+      </form>
+      <p style={{ marginTop: '1rem' }}>
+        Don't have an account? <Link to="/register">Register here</Link>
+      </p>
     </div>
-  )
+  );
 }
