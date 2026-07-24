@@ -594,7 +594,7 @@ try {
 
     buffer = remainder
 
-    for (const { event, data } of events) {
+    for (const { event, data } of events) { 
       try {
         const parsed = JSON.parse(data)
 
@@ -614,6 +614,8 @@ try {
   }
 } finally {
   reader.releaseLock()
+}
+ },
 }
 // ---------------------------------------------------------------------------
 // Health API
