@@ -16,7 +16,7 @@ def test_complete_auth_flow(client: TestClient):
         json=register_data
     )
 
-    assert register_response.status_code == 201
+    assert register_response.status_code == 201, register_response.text
 
     # Step 2: Login user
     login_response = client.post(
