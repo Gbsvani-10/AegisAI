@@ -24,8 +24,8 @@ const AUTH_ENDPOINTS = ['/auth/login', '/auth/register']
 // Handle 401 errors
 api.interceptors.response.use(
   (response: AxiosResponse) => response,
-  (error: any) => {
-    const url = error.config?.url || ''
+  (error: AxiosError) => {
+    const url = error.config?.url ?? ''
     const isAuthEndpoint = AUTH_ENDPOINTS.some((endpoint) =>
       url.includes(endpoint)
     )
