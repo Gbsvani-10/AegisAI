@@ -572,50 +572,49 @@ export const ragApi = {
       .pipeThrough(new TextDecoderStream())
       .getReader()
 
-    let buffer = ''
+ let buffer = ''
 
-    try {
-      while (true) {
-        const {
-          value,
-          done,
-        } = await reader.read()
+try {
+  let isReading = true
 
-        if (done) break
+  while (isReading) {
+    const { value, done } = await reader.read()
 
-        buffer += value
-
-        const {
-          events,
-          remainder,
-        } = parseSseBuffer(buffer)
-
-        buffer = remainder
-
-        for (const { event, data } of events) {
-          try {
-            const parsed = JSON.parse(data)
-
-            if (event === 'meta') {
-              callbacks.onMeta?.(parsed)
-            } else if (event === 'token') {
-              callbacks.onToken?.(parsed.delta)
-            } else if (event === 'done') {
-              callbacks.onDone?.(parsed)
-            } else if (event === 'error') {
-              callbacks.onError?.(parsed)
-            }
-          } catch {
-            // Skip malformed JSON frames
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock()
+    if (done) {
+      isReading = false
+      break
     }
-  },
-}
 
+    buffer += value
+
+    const {
+      events,
+      remainder,
+    } = parseSseBuffer(buffer)
+
+    buffer = remainder
+
+    for (const { event, data } of events) {
+      try {
+        const parsed = JSON.parse(data)
+
+        if (event === 'meta') {
+          callbacks.onMeta?.(parsed)
+        } else if (event === 'token') {
+          callbacks.onToken?.(parsed.delta)
+        } else if (event === 'done') {
+          callbacks.onDone?.(parsed)
+        } else if (event === 'error') {
+          callbacks.onError?.(parsed)
+        }
+      } catch {
+        // Skip malformed JSON frames
+      }
+    }
+  }
+} finally {
+  reader.releaseLock()
+}
 // ---------------------------------------------------------------------------
 // Health API
 // ---------------------------------------------------------------------------
