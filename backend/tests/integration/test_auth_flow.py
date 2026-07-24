@@ -7,6 +7,8 @@ def test_complete_auth_flow(client: TestClient):
     register_data = {
         "email": "flow@example.com",
         "password": "testpassword123"
+        "full_name": "Flow Test User",
+        "company_name": "Flow Test Company"
     }
 
     register_response = client.post(
