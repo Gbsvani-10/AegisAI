@@ -6,95 +6,170 @@ metadata:
     app: aegisai-backend
 spec:
   replicas: 2
+
   selector:
     matchLabels:
       app: aegisai-backend
+
   template:
     metadata:
       labels:
         app: aegisai-backend
+
     spec:
-      # 1. Production Native Python InitContainer to pre-cache exact model assets
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: aegisai-backend
+              topologyKey: kubernetes.io/hostname
+
       initContainers:
-      - name: model-download
-        image: python:3.11-slim
-        command:
-        - sh
-        - "-c"
-        - |
-          pip install --no-cache-dir transformers torch sentencepiece
-          python - <<'PY'
-          import os
-          from transformers import AutoModel, AutoTokenizer
+        - name: model-download
+          image: python:3.11-slim
 
-          MODEL = "microsoft/deberta-v3-small"
-          target_dir = "/app/models"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
 
-          print(f"Starting native cache generation for {MODEL} into {target_dir}...")
-          
-          # Prefetch fully valid weights and tokenizer structures natively
-          AutoTokenizer.from_pretrained(MODEL, cache_dir=target_dir)
-          AutoModel.from_pretrained(MODEL, cache_dir=target_dir)
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
 
-          print("Model weights and structural vocabularies downloaded successfully.")
-          PY
-        volumeMounts:
-        - name: model-storage
-          mountPath: /app/models
+          command:
+            - sh
+            - "-c"
+            - |
+              pip install --no-cache-dir transformers torch sentencepiece
+
+              python - <<'PY'
+              from transformers import AutoModel, AutoTokenizer
+
+              MODEL = "microsoft/deberta-v3-small"
+              target_dir = "/app/models"
+
+              print(
+                  f"Starting native cache generation for {MODEL} "
+                  f"into {target_dir}..."
+              )
+
+              AutoTokenizer.from_pretrained(
+                  MODEL,
+                  cache_dir=target_dir,
+              )
+
+              AutoModel.from_pretrained(
+                  MODEL,
+                  cache_dir=target_dir,
+              )
+
+              print(
+                  "Model weights and structural vocabularies "
+                  "downloaded successfully."
+              )
+              PY
+
+          volumeMounts:
+            - name: model-storage
+              mountPath: /app/models
+
+            - name: tmp-storage
+              mountPath: /tmp
+
+            - name: python-cache
+              mountPath: /home/appuser/.cache
 
       containers:
-      - name: aegisai-backend
-        image: aegisai-backend:latest
-        ports:
-        - containerPort: 8000
-        envFrom:
-        - configMapRef:
-            name: aegisai-config
-        - secretRef:
-            name: aegisai-secrets
-        resources:
-          requests:
-            cpu: "250m"
-            memory: "512Mi"
-          limits:
-            cpu: "1000m"
-            memory: "2Gi"
-        startupProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          failureThreshold: 30
-          periodSeconds: 10    
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 5
-          successThreshold: 1
-          failureThreshold: 2
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 3
-        volumeMounts:
-        - name: faiss-storage
-          mountPath: /app/faiss_index
-        - name: model-storage
-          mountPath: /app/models
+        - name: aegisai-backend
+
+          # Use a specific version tag instead of latest.
+          # Replace v1.0.0 with the tag used by your image build pipeline.
+          image: aegisai-backend:v1.0.0
+
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+
+          ports:
+            - containerPort: 8000
+
+          envFrom:
+            - configMapRef:
+                name: aegisai-config
+
+            - secretRef:
+                name: aegisai-secrets
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+
+            limits:
+              cpu: "1000m"
+              memory: "2Gi"
+
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8000
+
+            failureThreshold: 30
+            periodSeconds: 10
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            successThreshold: 1
+            failureThreshold: 2
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: faiss-storage
+              mountPath: /app/faiss_index
+
+            - name: model-storage
+              mountPath: /app/models
+
+            - name: tmp-storage
+              mountPath: /tmp
 
       volumes:
-      - name: faiss-storage
-        persistentVolumeClaim:
-          claimName: faiss-pvc
-      - name: model-storage
-        persistentVolumeClaim:
-          claimName: model-pvc
+        - name: faiss-storage
+          persistentVolumeClaim:
+            claimName: faiss-pvc
+
+        - name: model-storage
+          persistentVolumeClaim:
+            claimName: model-pvc
+
+        - name: tmp-storage
+          emptyDir: {}
+
+        - name: python-cache
+          emptyDir: {}
+
 ---
 apiVersion: v1
 kind: Service
@@ -102,42 +177,52 @@ metadata:
   name: aegisai-backend
   labels:
     app: aegisai-backend
+
 spec:
   selector:
     app: aegisai-backend
+
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 8000
+    - protocol: TCP
+      port: 80
+      targetPort: 8000
+
   type: ClusterIP
+
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: faiss-pvc
+
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
+
   resources:
     requests:
       storage: 5Gi
+
 ---
-# Added new PersistentVolumeClaim for model persistence
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: model-pvc
+
 spec:
   accessModes:
-  - ReadWriteOnce
+    - ReadWriteOnce
+
   resources:
     requests:
       storage: 5Gi
+
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: aegisai-config
+
 data:
   APP_NAME: "AegisAI"
   DEBUG: "false"
