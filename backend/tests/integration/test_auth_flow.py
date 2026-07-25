@@ -9,8 +9,7 @@ def test_complete_auth_flow(client: TestClient):
     "password": "Testpassword123!",
     "full_name": "Flow Test User",
     "company_name": "Flow Test Company",
-}
-
+      
     register_response = client.post(
         "/api/v1/auth/register",
         json=register_data
